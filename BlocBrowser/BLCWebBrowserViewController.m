@@ -7,16 +7,19 @@
 //
 
 #import "BLCWebBrowserViewController.h"
+#import "BLCFLoatingToolbar.h"
 
-@interface BLCWebBrowserViewController () <UIWebViewDelegate, UITextFieldDelegate>
+#define kBrowserBackString NSLocalizedString(@"Back", @"Back command")
+#define kBrowserForwardString NSLocalizedString(@"Forward", @"Forward command")
+#define kBrowserStopString NSLocalizedString(@"Stop", @"Stop command")
+#define kBrowserRefreshString NSLocalizedString(@"Refresh", @"Refresh command")
+
+@interface BLCWebBrowserViewController () <UIWebViewDelegate, UITextFieldDelegate, BLCFLoatingToolbarDelegate>
 
 @property (nonatomic, strong) UIWebView *webView;
 @property (nonatomic, strong) UITextField *textField;
-@property (nonatomic, strong) UIButton *backButton;
-@property (nonatomic, strong) UIButton *forwardButton;
-@property (nonatomic, strong) UIButton *stopButton;
-@property (nonatomic, strong) UIButton *reloadButton;
 @property (nonatomic, strong) UIActivityIndicatorView *activityIndicator;
+@property (nonatomic, strong) BLCFLoatingToolbar *toolbar;
 
 @property (nonatomic, assign) NSUInteger frameCount;
 
@@ -50,14 +53,14 @@
     self.textField.delegate = self;
     [self buildURLField];
     
-    [self buildButtons];
+    self.toolbar = [[BLCFLoatingToolbar alloc] initWithFourTitles:@[kBrowserBackString, kBrowserForwardString, kBrowserStopString, kBrowserRefreshString]];
+    self.toolbar.delegate = self;
+    
     
     [mainView addSubview:self.webView];
     [mainView addSubview:self.textField];
-    [mainView addSubview:self.backButton];
-    [mainView addSubview:self.forwardButton];
-    [mainView addSubview:self.stopButton];
-    [mainView addSubview:self.reloadButton];
+
+    [mainView addSubview:self.toolbar];
     
     self.view = mainView;
 }
@@ -72,30 +75,6 @@
     self.textField.backgroundColor = [UIColor colorWithWhite:220/255.0f alpha:1];
 }
 
-- (void)buildButtons {
-    //Back
-    self.backButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.backButton setEnabled:NO];
-    [self.backButton setTitle:NSLocalizedString(@"Back", @"Back command") forState:UIControlStateNormal];
-    
-    //forward
-    self.forwardButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.forwardButton setEnabled:NO];
-    [self.forwardButton setTitle:NSLocalizedString(@"Forward", @"Forward command") forState:UIControlStateNormal];
-    
-    //reload
-    self.reloadButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.reloadButton setEnabled:NO];
-    [self.reloadButton setTitle:NSLocalizedString(@"Reload", @"Reload command") forState:UIControlStateNormal];
-    
-    //stop
-    self.stopButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.stopButton setEnabled:NO];
-    [self.stopButton setTitle:NSLocalizedString(@"Stop", @"Stop command") forState:UIControlStateNormal];
-    
-    [self addButtonTargets];
-    
-}
 
 - (void)updateButtonsAndTitle {
     NSString *webpageTitle = [self.webView stringByEvaluatingJavaScriptFromString:@"document.title"];
@@ -112,10 +91,10 @@
         [self.activityIndicator stopAnimating];
     }
     
-    self.backButton.enabled = [self.webView canGoBack];
-    self.forwardButton.enabled = [self.webView canGoForward];
-    self.stopButton.enabled = self.frameCount > 0;
-    self.reloadButton.enabled = self.webView.request.URL && self.frameCount == 0;
+    [self.toolbar setEnabled:[self.webView canGoBack] forButtonWithTitle:kBrowserBackString];
+    [self.toolbar setEnabled:[self.webView canGoForward] forButtonWithTitle:kBrowserForwardString];
+    [self.toolbar setEnabled:self.frameCount > 0 forButtonWithTitle:kBrowserStopString];
+    [self.toolbar setEnabled:self.webView.request.URL && self.frameCount == 0 forButtonWithTitle:kBrowserRefreshString];
 }
 
 #pragma mark - UITextFieldDelegate
@@ -183,19 +162,12 @@
     
     static const CGFloat itemHeight = 50;
     CGFloat width =CGRectGetWidth(self.view.bounds);
-    CGFloat browserHeight = CGRectGetHeight(self.view.bounds) - itemHeight - itemHeight;
-    CGFloat buttonWidth = CGRectGetWidth(self.view.bounds) / 4;
+    CGFloat browserHeight = CGRectGetHeight(self.view.bounds) - itemHeight;
     
     self.textField.frame = CGRectMake(0, 0, width, itemHeight);
     self.webView.frame = CGRectMake(0, CGRectGetMaxY(self.textField.frame), width, browserHeight);
     
-    CGFloat currentButtonX = 0;
-    
-    for (UIButton *thisButton in @[self.backButton, self.forwardButton, self.stopButton, self.reloadButton]) {
-        thisButton.frame = CGRectMake(currentButtonX, CGRectGetMaxY(self.webView.frame), buttonWidth, itemHeight);
-        currentButtonX += buttonWidth;
-    }
-    
+    self.toolbar.frame = CGRectMake(20, 100, 280, 60);
 }
 
 - (void)resetWebView {
@@ -208,23 +180,21 @@
     
     self.webView = newWebView;
     
-    [self addButtonTargets];
-    
     self.textField.text = nil;
     
     [self updateButtonsAndTitle];
 }
 
-- (void)addButtonTargets {
-    for (UIButton *button in @[self.backButton, self.forwardButton, self.stopButton, self.reloadButton]) {
-        [button removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
+- (void) floatingToolbar:(BLCFLoatingToolbar *)toolbar didSelectButtonWithTitle:(NSString *)title {
+    if ([title isEqual:kBrowserBackString]) {
+        [self.webView goBack];
+    } else if ([title isEqual:kBrowserForwardString]) {
+        [self.webView goForward];
+    } else if ([title isEqual:kBrowserStopString]) {
+        [self.webView stopLoading];
+    } else if ([title isEqual:kBrowserRefreshString]) {
+        [self.webView reload];
     }
-    
-    [self.backButton addTarget:self.webView action:@selector(goBack) forControlEvents:UIControlEventTouchUpInside];
-    [self.forwardButton addTarget:self.webView action:@selector(goForward) forControlEvents:UIControlEventTouchUpInside];
-    [self.stopButton addTarget:self.webView action:@selector(stopLoading) forControlEvents:UIControlEventTouchUpInside];
-    [self.reloadButton addTarget:self.webView action:@selector(reload) forControlEvents:UIControlEventTouchUpInside];
-    
 }
 
 @end

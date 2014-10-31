@@ -7,8 +7,11 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "BLCFLoatingToolbar.h"
 
 @interface BLCWebBrowserViewController : UIViewController
+
+- (void) floatingToolbar:(BLCFLoatingToolbar *)toolbar didSelectButtonWithTitle:(NSString *)title;
 
 - (void)resetWebView;
 
